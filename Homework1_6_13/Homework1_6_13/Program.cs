@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace Homework1_6_13
@@ -18,50 +19,31 @@ namespace Homework1_6_13
         }
     }
 
-    abstract class Trader
+    class Customer
     {
-        protected float Money;
+        private float _money;
 
-        public Trader(float money)
+        public Customer (float money)
         {
-            Money = money;
-        }
-    }
-
-    class Customer: Trader
-    {
-        private Receipt _receipt;
-
-        public Customer (float money): base(money) 
-        {
-            BrokenSparePartName = CarParts.GetRandomName();
+            BrokenSparePartName = CarPartsUtilits.GetRandomName();
+            _money = money;
         }
 
         public string BrokenSparePartName { get; private set; }
 
-        public void TakeFinePrice(CarService carService)
+        public void TakeFinePrice(float price)
         {
-            Money += carService.FinePrice;
+            _money += price;
         }
 
-        public void TakeErrorFinePrice(CarService carService)
+        public void PayToWork(Receipt receipt)
         {
-            Money += carService.SparePartPrice;
-        }
+            _money -= receipt.PriceForWork + receipt.PriceForSparePart;
 
-        public void AddReceipt(Receipt receipt)
-        {
-            _receipt = receipt;
-        }
-
-        public void PayToWork()
-        {
-            Money -= _receipt.PriceForWork + _receipt.PriceForSparePart;
-
-            if (Money < 0)
+            if (_money < 0)
             {
                 Console.WriteLine("У клиента не хватило денег, ему пришлось взять в долг и он попал в рабство");
-                Money = 0;
+                _money = 0;
             }
             else
             {
@@ -70,21 +52,23 @@ namespace Homework1_6_13
         }
     }
 
-    class CarService : Trader
+    class CarService
     {
         private const float DefaultStartMoney = 2000;
-        private const float PriceForWork = 600;
 
+        private readonly float _priceForWork = 600;
         private Stock _stock;
         private List<Receipt> _receipts;
         private Queue<Customer> _customers;
         private bool _isWork;
+        private float _money;
 
-        public CarService(float money = DefaultStartMoney) : base(money)
+        public CarService(float money = DefaultStartMoney)
         {
-            _stock = new Stock(CarParts.CreateCellsSpareParts());
+            _stock = new Stock(CarPartsUtilits.CreateCellsSpareParts());
             _receipts = new List<Receipt>();
             _customers = new Queue<Customer>();
+            _money = money;
             FinePrice = 500;
             SparePartPrice = 0;
 
@@ -105,7 +89,7 @@ namespace Homework1_6_13
             while (_isWork)
             {
                 Console.Clear();
-                Console.WriteLine($"Деньги: {Money}\n{AccommodateCustomerCommand}. Принять клиента");
+                Console.WriteLine($"Деньги: {_money}\n{AccommodateCustomerCommand}. Принять клиента");
                 Console.WriteLine($"{ShowReceiptsCommnad}. Вывести чеки");
                 Console.WriteLine($"{ExitCommand}. Закрыть автосервис");
 
@@ -212,11 +196,10 @@ namespace Homework1_6_13
                             if (customer.BrokenSparePartName == userSparePartName)
                             {
                                 SetSparePartPrice(customer);
-                                Receipt receipt = new Receipt(PriceForWork, SparePartPrice);
+                                Receipt receipt = new Receipt(_priceForWork, SparePartPrice);
                                 _receipts.Add(receipt);
-                                customer.AddReceipt(receipt);
-                                Money += PriceForWork + SparePartPrice;
-                                customer.PayToWork();
+                                customer.PayToWork(receipt);
+                                _money += _priceForWork + SparePartPrice;
                             }
                             else
                             {
@@ -242,8 +225,8 @@ namespace Homework1_6_13
         private void PayErrorFine(Customer customer)
         {
             SetSparePartPrice(customer);
-            customer.TakeErrorFinePrice(this);
-            Money -= SparePartPrice;
+            customer.TakeFinePrice(SparePartPrice);
+            _money -= SparePartPrice;
 
             _isWork = !IsBankruptcy();
             SparePartPrice = 0;
@@ -263,18 +246,18 @@ namespace Homework1_6_13
 
         private void PayFine(Customer customer)
         {
-            customer.TakeFinePrice(this);
-            Money -= FinePrice;
+            customer.TakeFinePrice(FinePrice);
+            _money -= FinePrice;
 
             _isWork = !IsBankruptcy();
         }
 
         private bool IsBankruptcy()
         {
-            if (Money < 0)
+            if (_money < 0)
             {
                 Console.WriteLine("Вы влезли в долги и стали банкротом. Автосервис более не Ваш");
-                Money = 0;
+                _money = 0;
                 return true;
             }
 
@@ -322,7 +305,7 @@ namespace Homework1_6_13
 
             for (int i=0; i < spareParts.Count && isErrorName == false; i++)
             {
-                if (CarParts.HaveName(spareParts[i].SparePart.Name) == false)
+                if (CarPartsDataBase.HaveName(spareParts[i].SparePart.Name) == false)
                 {
                     isErrorName = true;
                 }
@@ -444,27 +427,35 @@ namespace Homework1_6_13
         }
     }
 
-    class CarParts
+    class CarPartsDataBase
     {
-        static CarParts()
+        private static List<string> _names = new List<string>();
+
+        static CarPartsDataBase()
         {
-            Names.Add("Блок управления ABS");
-            Names.Add("Тормозной суппорт");
-            Names.Add("Тормозные диски");
-            Names.Add("Глушитель");
-            Names.Add("Колесо");
-            Names.Add("Аккумулятор");
-            Names.Add("Сцепление");
-            Names.Add("Маховик");
+            _names.Add("Блок управления ABS");
+            _names.Add("Тормозной суппорт");
+            _names.Add("Тормозные диски");
+            _names.Add("Глушитель");
+            _names.Add("Колесо");
+            _names.Add("Аккумулятор");
+            _names.Add("Сцепление");
+            _names.Add("Маховик");
         }
 
-        public static List<string> Names { get; private set; } = new List<string>();
+        public static List<string> GetNames()
+        {
+            List<string> names = new List<string>();
+            names.AddRange(_names);
+
+            return names;
+        }
 
         public static void AddName(string name)
         {
             if (HaveName(name) == false)
             {
-                Names.Add(name);
+                _names.Add(name);
             }
             else
             {
@@ -474,39 +465,44 @@ namespace Homework1_6_13
 
         public static bool HaveName(string nameToCheck)
         {
-            foreach (var name in Names)
+            foreach (var name in _names)
             {
                 if (name == nameToCheck)
                 {
                     return true;
                 }
             }
-
+            
             return false;
         }
+    }
 
+    class CarPartsUtilits
+    {
         public static string GetRandomName()
         {
-            return Names[UserUtilits.GenerateRandomNumber(0, Names.Count - 1)];
+            List<string> names = CarPartsDataBase.GetNames();
+            return names[UserUtilits.GenerateRandomNumber(names.Count - 1)];
         }
 
         public static List<CellSparePart> CreateCellsSpareParts()
         {
+            List<string> names = CarPartsDataBase.GetNames();
             List<CellSparePart> spareParts = new List<CellSparePart>();
             string errorMessageInputPrice = "Ошибка ввода стоимости, попробуйте заного";
             string errorMessageInputQuantity = "Ошибка ввода количества, попробуйте заного";
 
             Console.WriteLine("Введите стоимость, за которую хотите продавать запчасть и его количество в наличии:");
 
-            for (int i = 0; i < Names.Count; i++)
+            for (int i = 0; i < names.Count; i++)
             {
-                Console.WriteLine($"\n{i+1}. {Names[i]}:");
+                Console.WriteLine($"\n{i + 1}. {names[i]}:");
                 Console.Write("Стоимость - ");
-                int price = UserUtilits.GetInputWithErrorMessage(errorMessageInputPrice);
+                int price = UserUtilits.GetIntegerInputWithErrorMessage(errorMessageInputPrice);
                 Console.Write("Количество - ");
-                int quantity = UserUtilits.GetInputWithErrorMessage(errorMessageInputQuantity);
+                int quantity = UserUtilits.GetIntegerInputWithErrorMessage(errorMessageInputQuantity);
 
-                spareParts.Add(new CellSparePart(new SparePart(Names[i], price), quantity));
+                spareParts.Add(new CellSparePart(new SparePart(names[i], price), quantity));
             }
 
             return spareParts;
@@ -527,7 +523,7 @@ namespace Homework1_6_13
             return _random.Next(0, max + 1);
         }
 
-        public static int GetInputWithErrorMessage(string errorMessage)
+        public static int GetIntegerInputWithErrorMessage(string errorMessage)
         {
             int leftPosition = Console.CursorLeft;
             int topPosition = Console.CursorTop;
