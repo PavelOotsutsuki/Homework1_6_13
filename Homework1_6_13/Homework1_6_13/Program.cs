@@ -22,10 +22,14 @@ namespace Homework1_6_13
     class Customer
     {
         private float _money;
+        private CarPartsDatabase _carPartsDatabase;
+        private CarPartsUtilits _carPartsUtilits;
 
         public Customer (float money)
         {
-            BrokenSparePartName = CarPartsUtilits.GetRandomName();
+            _carPartsDatabase = new CarPartsDatabase();
+            _carPartsUtilits = new CarPartsUtilits(_carPartsDatabase);
+            BrokenSparePartName = _carPartsUtilits.GetRandomName();
             _money = money;
         }
 
@@ -62,10 +66,14 @@ namespace Homework1_6_13
         private Queue<Customer> _customers;
         private bool _isWork;
         private float _money;
+        private CarPartsDatabase _carPartsDatabase;
+        private CarPartsUtilits _carPartsUtilits;
 
         public CarService(float money = DefaultStartMoney)
         {
-            _stock = new Stock(CarPartsUtilits.CreateCellsSpareParts());
+            _carPartsDatabase = new CarPartsDatabase();
+            _carPartsUtilits = new CarPartsUtilits(_carPartsDatabase);
+            _stock = new Stock(_carPartsUtilits.CreateCellsSpareParts());
             _receipts = new List<Receipt>();
             _customers = new Queue<Customer>();
             _money = money;
@@ -82,7 +90,7 @@ namespace Homework1_6_13
         {
             const string AccommodateCustomerCommand = "1";
             const string ExitCommand = "3";
-            const string ShowReceiptsCommnad = "2";
+            const string ShowReceiptsCommand = "2";
 
             _isWork = true;
 
@@ -90,7 +98,7 @@ namespace Homework1_6_13
             {
                 Console.Clear();
                 Console.WriteLine($"Деньги: {_money}\n{AccommodateCustomerCommand}. Принять клиента");
-                Console.WriteLine($"{ShowReceiptsCommnad}. Вывести чеки");
+                Console.WriteLine($"{ShowReceiptsCommand}. Вывести чеки");
                 Console.WriteLine($"{ExitCommand}. Закрыть автосервис");
 
                 switch (Console.ReadLine())
@@ -99,7 +107,7 @@ namespace Homework1_6_13
                         AccommodateCustomer();
                         break;
 
-                    case ShowReceiptsCommnad:
+                    case ShowReceiptsCommand:
                         ShowReceipts();
                         break;
 
@@ -175,7 +183,7 @@ namespace Homework1_6_13
 
         private void UseDetail(Customer customer)
         {
-            if (_stock.HaveSpareParts())
+            if (_stock.HaveSparePartsCells())
             {
                 bool isSuccessInput = false;
 
@@ -297,44 +305,26 @@ namespace Homework1_6_13
 
     class Stock
     {
-        private List<CellSparePart> _spareParts;
+        private List<CellSparePart> _sparePartsCells;
 
-        public Stock (List<CellSparePart> spareParts)
+        public Stock (List<CellSparePart> sparePartsCells)
         {
-            bool isErrorName = false;
-
-            for (int i=0; i < spareParts.Count && isErrorName == false; i++)
-            {
-                if (CarPartsDataBase.HaveName(spareParts[i].SparePart.Name) == false)
-                {
-                    isErrorName = true;
-                }
-            }
-
-            if (isErrorName == false)
-            {
-                _spareParts = spareParts;
-            }
-            else
-            {
-                Console.WriteLine("Ошибка, ввод несуществующей детали");
-                _spareParts = null;
-            }
+            _sparePartsCells = sparePartsCells;
         }
 
         public void ShowInfo()
         {
-            for (int i = 0; i < _spareParts.Count; i++)
+            for (int i = 0; i < _sparePartsCells.Count; i++)
             {
                 Console.Write($"{i+1}. ");
-                _spareParts[i].ShowInfo();
+                _sparePartsCells[i].ShowInfo();
                 Console.WriteLine();
             }
         }
 
         public bool TryGetSparePartPrice(string sparePartName, out float price)
         {
-            foreach (var sparePart in _spareParts)
+            foreach (var sparePart in _sparePartsCells)
             {
                 if (sparePart.SparePart.Name == sparePartName)
                 {
@@ -349,9 +339,9 @@ namespace Homework1_6_13
 
         public bool TryUseSparePart(int index, out string usedSparePartName)
         {
-            if (index >= 0 && index < _spareParts.Count)
+            if (index >= 0 && index < _sparePartsCells.Count)
             {
-                if (_spareParts[index].TryUse(out usedSparePartName))
+                if (_sparePartsCells[index].TryGive(out usedSparePartName))
                 {
                     return true;
                 }
@@ -362,9 +352,9 @@ namespace Homework1_6_13
             return false;
         }
 
-        public bool HaveSpareParts()
+        public bool HaveSparePartsCells()
         {
-            return _spareParts.Count > 0;
+            return _sparePartsCells.Count > 0;
         }
     }
 
@@ -401,7 +391,7 @@ namespace Homework1_6_13
         public SparePart SparePart { get; private set; }
         public int Quantity { get; private set; }
 
-        public bool TryUse (out string usedSparePartName)
+        public bool TryGive (out string usedSparePartName)
         {
             if (HaveQuantity())
             {
@@ -427,23 +417,26 @@ namespace Homework1_6_13
         }
     }
 
-    class CarPartsDataBase
+    class CarPartsDatabase
     {
-        private static List<string> _names = new List<string>();
+        private List<string> _names;
 
-        static CarPartsDataBase()
+        public CarPartsDatabase()
         {
-            _names.Add("Блок управления ABS");
-            _names.Add("Тормозной суппорт");
-            _names.Add("Тормозные диски");
-            _names.Add("Глушитель");
-            _names.Add("Колесо");
-            _names.Add("Аккумулятор");
-            _names.Add("Сцепление");
-            _names.Add("Маховик");
+            _names = new List<string>()
+            {
+                "Блок управления ABS",
+                "Тормозной суппорт",
+                "Тормозные диски",
+                "Глушитель",
+                "Колесо",
+                "Аккумулятор",
+                "Сцепление",
+                "Маховик"
+            };
         }
 
-        public static List<string> GetNames()
+        public List<string> GetNames()
         {
             List<string> names = new List<string>();
             names.AddRange(_names);
@@ -451,7 +444,7 @@ namespace Homework1_6_13
             return names;
         }
 
-        public static void AddName(string name)
+        public void AddName(string name)
         {
             if (HaveName(name) == false)
             {
@@ -463,32 +456,36 @@ namespace Homework1_6_13
             }
         }
 
-        public static bool HaveName(string nameToCheck)
+        public bool HaveName(string nameToCheck)
         {
-            foreach (var name in _names)
-            {
-                if (name == nameToCheck)
-                {
-                    return true;
-                }
-            }
-            
-            return false;
+            return _names.Contains(nameToCheck);
         }
     }
 
     class CarPartsUtilits
     {
-        public static string GetRandomName()
+        private CarPartsDatabase _carPartsDatabase;
+
+        public CarPartsUtilits()
         {
-            List<string> names = CarPartsDataBase.GetNames();
+            _carPartsDatabase = new CarPartsDatabase();
+        }
+
+        public CarPartsUtilits(CarPartsDatabase carPartsDatabase)
+        {
+            _carPartsDatabase = carPartsDatabase;
+        }
+
+        public string GetRandomName()
+        {
+            List<string> names = _carPartsDatabase.GetNames();
             return names[UserUtilits.GenerateRandomNumber(names.Count - 1)];
         }
 
-        public static List<CellSparePart> CreateCellsSpareParts()
+        public List<CellSparePart> CreateCellsSpareParts()
         {
-            List<string> names = CarPartsDataBase.GetNames();
-            List<CellSparePart> spareParts = new List<CellSparePart>();
+            List<string> names = _carPartsDatabase.GetNames();
+            List<CellSparePart> sparePartsCells = new List<CellSparePart>();
             string errorMessageInputPrice = "Ошибка ввода стоимости, попробуйте заного";
             string errorMessageInputQuantity = "Ошибка ввода количества, попробуйте заного";
 
@@ -502,10 +499,10 @@ namespace Homework1_6_13
                 Console.Write("Количество - ");
                 int quantity = UserUtilits.GetIntegerInputWithErrorMessage(errorMessageInputQuantity);
 
-                spareParts.Add(new CellSparePart(new SparePart(names[i], price), quantity));
+                sparePartsCells.Add(new CellSparePart(new SparePart(names[i], price), quantity));
             }
 
-            return spareParts;
+            return sparePartsCells;
         }
     }
 
